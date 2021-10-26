@@ -4,48 +4,72 @@ include_once '../config/db.php';
 include_once '../objects/user.php';
 include_once '../config/header.php';
 
-use \Firebase\JWT\JWK;
+require __DIR__ . '../../../vendor/autoload.php';
+
+use \Firebase\JWT\JWT;
 
 $db = new Database();
 $conn = $db->getConnection();
 
-// $user = new User($conn);
+$registeredUser = new User($conn);
+
 $data = json_decode(file_get_contents("php://input"));
 
-if(
-    !empty($data->username) &&
-    !empty($data->password)
-){} else{
-    http_response_code(400);
-    echo json_encode(array("message" => "Unable to signin user. Data is incorrect."));
-}
+$input_username = $data->email;
+$input_pass = $data->password;
 
-$stmt = $user->read();
-$num = $stmt->rowCount();
-  
-if($num>0){
-    $users_arr=array();
-    $users_arr["records"]=array();
-    
-    while ($row = $stmt->fetch(PDO::FETCH_ASSOC)){
-        extract($row);
-  
-        $user_item=array(
-            "id" => $id,
-            "name" => $name,
-            "last" => $last,
-            "username" => $username,
-            "email" => $email,
-            "password" => $password
-        );
-  
-        array_push($users_arr["records"], $user_item);
+if(
+    !empty($input_username) &&
+    !empty($input_pass)
+){
+    $registeredUser->username = $input_username;
+    $registeredUser->password = $input_pass;
+
+    $stmt = $registeredUser->signin();
+    $numOfRows = $stmt->rowCount();
+
+    if($numOfRows > 0) {
+        $row = $stmt->fetch(PDO::FETCH_ASSOC);
+        $name = $row['name'];
+        $last = $row['last'];
+        $username = $row['username'];
+        $email = $row['email'];
+        $password = $row['password'];
+        $secret_key = "D4shb0@rd";
+        $issuer_claim = "localhost"; 
+        $audience_claim = "THE_AUDIENCE";
+        $issuedat_claim = time();
+        $notbefore_claim = $issuedat_claim + 10; 
+        $expire_claim = $issuedat_claim + 60; 
+
+        $token = array(
+            "iss" => $issuer_claim,
+            "aud" => $audience_claim,
+            "iat" => $issuedat_claim,
+            "nbf" => $notbefore_claim,
+            "exp" => $expire_claim,
+            "data" => array(
+                "name" => $name,
+                "last" => $last,
+                "username" => $username,
+                "email" => $email
+        ));
+
+        $jwtValue = JWT::encode($token, $secret_key);
+        http_response_code(200);
+        echo json_encode(
+            array(
+                "message" => "success",
+                "token" => $jwtValue,
+                "expiry" => $expire_claim
+            ));
+    } else {
+        http_response_code(400);
+        echo json_encode(array("message" => "Username or password incorrect."));
     }
-    http_response_code(200);
-    echo json_encode($users_arr);
-} else {
-    http_response_code(404);
-    echo json_encode(array("message" => "No users found."));
+} else{
+    http_response_code(400);
+    echo json_encode(array("message" => "Unable to signin user. Data is incomplete."));
 }
 
 ?>
