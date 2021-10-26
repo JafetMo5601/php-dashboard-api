@@ -4,7 +4,6 @@ class User {
     private $conn;
     private $table_name = "users";
 
-    public $id;
     public $name;
     public $last;
     public $username;
@@ -16,8 +15,14 @@ class User {
     }
 
     function signin(){
-        $query = "SELECT username, `password` FROM " . $this->table_name . " WHERE username=:username";
+        $query = "SELECT name, last, username, email, password FROM " . $this->table_name . " WHERE username=:username AND password=:password LIMIT 0,1";
         $stmt = $this->conn->prepare($query);
+
+        $this->username=htmlspecialchars(strip_tags($this->username));
+        $stmt->bindParam(":username", $this->username);
+        $this->password=htmlspecialchars(strip_tags($this->password));
+        $stmt->bindParam(":password", $this->password);
+        
         $stmt->execute();
         return $stmt;
     }
